@@ -67,6 +67,36 @@ h1 {
   gap: 8px;
 }
 
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.menu-item {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.menu-item-name {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.menu-item-price {
+  font-size: 13px;
+  color: #666;
+}
+
+.menu-item .stepper {
+  justify-content: flex-end;
+}
+
 .pill {
   display: inline-block;
   padding: 3px 10px;
@@ -146,4 +176,65 @@ select {
 .status-disconnected {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.order-card {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.order-table {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.order-time {
+  font-size: 12px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 14px;
+  color: #374151;
+}
+
+.order-total {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 8px;
+  margin-top: 6px;
+  border-top: 1px solid #e5e7eb;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.print-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.print-status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.print-status.printed {
+  background: #dcfce7;
+  color: #166534;
 }

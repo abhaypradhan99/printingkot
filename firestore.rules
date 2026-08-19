@@ -1,18 +1,19 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /menu/{menuId} {
+
+    // MVP rules: open read/write so the app works immediately with no
+    // login system. Fine for a single-restaurant internal tool on a
+    // private/staff-only URL, but anyone with the URL could edit data.
+    // See README "Adding real security" section before wider rollout.
+    match /menu/{docId} {
       allow read, write: if true;
     }
-    match /tables/{tableId} {
+    match /tables/{docId} {
       allow read, write: if true;
     }
-    match /orders/{orderId} {
+    match /orders/{docId} {
       allow read, write: if true;
-    }
-    match /{document=**} {
-      allow read, write: if false;
     }
   }
 }

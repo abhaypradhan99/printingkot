@@ -33,6 +33,7 @@ export default function PrintStationPage() {
   const [error, setError] = useState("");
   const [log, setLog] = useState([]);
   const [restaurantName, setRestaurantName] = useState("My Restaurant");
+  const [orders, setOrders] = useState([]);
   const printerRef = useRef(null);
   const stationIdRef = useRef(null);
   const printingQueueRef = useRef(Promise.resolve());
@@ -52,8 +53,10 @@ export default function PrintStationPage() {
   }, []);
 
   useEffect(() => {
-    const q = query(collection(db, "orders"), orderBy("createdAt", "asc"));
+    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
+      const allOrders = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setOrders(allOrders);
       snap.docChanges().forEach((change) => {
         if (change.type === "added" || change.type === "modified") {
           const order = { id: change.doc.id, ...change.doc.data() };
@@ -103,6 +106,22 @@ export default function PrintStationPage() {
     });
   }
 
+  async function handleManualPrint(order) {
+    setError("");
+    if (!connected || !printerRef.current || !printerRef.current.isConnected()) {
+      setError("Printer not connected");
+      return;
+    }
+    try {
+      await printOrder(order);
+      addLog(`Reprinted order for ${order.tableName}`);
+    } catch (e) {
+      const msg = e.message || "Print failed";
+      setError(msg);
+      addLog(`Reprint failed for ${order.tableName}: ${msg}`);
+    }
+  }
+
   async function handleConnect() {
     setError("");
     setConnecting(true);
@@ -127,6 +146,12 @@ export default function PrintStationPage() {
   function saveRestaurantName(name) {
     setRestaurantName(name);
     localStorage.setItem("restaurant_name", name);
+  }
+
+  function formatTime(createdAt) {
+    if (!createdAt) return "";
+    const ms = createdAt.toMillis ? createdAt.toMillis() : new Date(createdAt).getTime();
+    return new Date(ms).toLocaleString();
   }
 
   return (
@@ -173,6 +198,51 @@ export default function PrintStationPage() {
           Use Chrome on Android. Make sure the printer is powered on and
           paired/discoverable before tapping Connect.
         </p>
+      </div>
+
+      <div className="card">
+        <strong>Orders</strong>
+        {orders.length === 0 && (
+          <p style={{ fontSize: 13, color: "#666", marginTop: 6 }}>
+            No orders yet.
+          </p>
+        )}
+        {orders.map((order) => {
+          const stationId = stationIdRef.current;
+          const alreadyPrinted = (order.printedBy || []).includes(stationId);
+          return (
+            <div className="order-card" key={order.id}>
+              <div className="order-header">
+                <div>
+                  <div className="order-table">Table {order.tableName}</div>
+                  <div className="order-time">{formatTime(order.createdAt)}</div>
+                </div>
+                <span className={`print-status ${alreadyPrinted ? "printed" : "pending"}`}>
+                  {alreadyPrinted ? "Printed" : "Pending"}
+                </span>
+              </div>
+              {order.items.map((item, idx) => (
+                <div className="order-item" key={idx}>
+                  <span>{item.name}</span>
+                  <span>x{item.qty} — Rs. {item.qty * item.price}</span>
+                </div>
+              ))}
+              <div className="order-total">
+                <span>Total</span>
+                <span>Rs. {order.total}</span>
+              </div>
+              {connected && (
+                <button
+                  className="btn btn-primary"
+                  style={{ marginTop: 10 }}
+                  onClick={() => handleManualPrint(order)}
+                >
+                  {alreadyPrinted ? "Print Again" : "Print Now"}
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="card">

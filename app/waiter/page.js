@@ -117,25 +117,19 @@ export default function WaiterPage() {
       {Object.entries(grouped).map(([category, items]) => (
         <div className="card" key={category}>
           <strong>{category}</strong>
-          {items.map((item) => (
-            <div
-              className="row"
-              key={item.id}
-              style={{ marginTop: 10 }}
-            >
-              <div>
-                <div>{item.name}</div>
-                <div style={{ fontSize: 13, color: "#666" }}>
-                  Rs. {item.price}
+          <div className="menu-grid">
+            {items.map((item) => (
+              <div className="menu-item" key={item.id}>
+                <div className="menu-item-name">{item.name}</div>
+                <div className="menu-item-price">Rs. {item.price}</div>
+                <div className="stepper">
+                  <button onClick={() => changeQty(item.id, -1)}>−</button>
+                  <span>{cart[item.id] || 0}</span>
+                  <button onClick={() => changeQty(item.id, 1)}>+</button>
                 </div>
               </div>
-              <div className="stepper">
-                <button onClick={() => changeQty(item.id, -1)}>−</button>
-                <span>{cart[item.id] || 0}</span>
-                <button onClick={() => changeQty(item.id, 1)}>+</button>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       ))}
 
