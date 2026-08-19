@@ -12,6 +12,7 @@ import {
   query,
   serverTimestamp,
   getDocs,
+  setDoc,
 } from "firebase/firestore";
 
 export default function AdminPage() {
@@ -28,6 +29,12 @@ export default function AdminPage() {
           Menu
         </div>
         <div
+          className={`tab ${tab === "categories" ? "active" : ""}`}
+          onClick={() => setTab("categories")}
+        >
+          Categories
+        </div>
+        <div
           className={`tab ${tab === "tables" ? "active" : ""}`}
           onClick={() => setTab("tables")}
         >
@@ -40,7 +47,7 @@ export default function AdminPage() {
           Orders
         </div>
       </div>
-      {tab === "menu" ? <MenuAdmin /> : tab === "tables" ? <TablesAdmin /> : <OrdersAdmin />}
+      {tab === "menu" ? <MenuAdmin /> : tab === "categories" ? <CategoriesAdmin /> : tab === "tables" ? <TablesAdmin /> : <OrdersAdmin />}
       <a href="/" className="btn btn-secondary" style={{ marginTop: 8 }}>
         Back
       </a>
@@ -143,6 +150,98 @@ function MenuAdmin() {
           >
             Delete
           </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CategoriesAdmin() {
+  const [categories, setCategories] = useState([]);
+  const [order, setOrder] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const unsubItems = onSnapshot(
+      query(collection(db, "menu"), orderBy("createdAt", "desc")),
+      (snap) => {
+        const cats = new Set();
+        snap.docs.forEach((d) => {
+          const cat = d.data().category || "General";
+          cats.add(cat);
+        });
+        setCategories(Array.from(cats));
+      }
+    );
+    const unsubOrder = onSnapshot(doc(db, "config", "categoryOrder"), (snap) => {
+      const data = snap.data();
+      setOrder(data?.order || []);
+    });
+    return () => {
+      unsubItems();
+      unsubOrder();
+    };
+  }, []);
+
+  async function saveOrder(newOrder) {
+    setSaving(true);
+    try {
+      await setDoc(doc(db, "config", "categoryOrder"), { order: newOrder }, { merge: true });
+      setOrder(newOrder);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function moveCategory(index, direction) {
+    const newOrder = [...order];
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+    [newOrder[index], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[index]];
+    await saveOrder(newOrder);
+  }
+
+  const sorted = [...categories].sort((a, b) => {
+    const ai = order.indexOf(a);
+    const bi = order.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  return (
+    <div>
+      <div className="card">
+        <strong>Category Order</strong>
+        <p style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
+          This controls how categories appear for waiters.
+        </p>
+      </div>
+      {sorted.length === 0 && (
+        <p style={{ color: "#666" }}>No categories yet.</p>
+      )}
+      {sorted.map((cat, idx) => (
+        <div className="card row" key={cat}>
+          <strong>{cat}</strong>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              className="btn btn-secondary"
+              style={{ width: "auto", padding: "8px 12px" }}
+              onClick={() => moveCategory(idx, -1)}
+              disabled={idx === 0 || saving}
+            >
+              ↑
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{ width: "auto", padding: "8px 12px" }}
+              onClick={() => moveCategory(idx, 1)}
+              disabled={idx === sorted.length - 1 || saving}
+            >
+              ↓
+            </button>
+          </div>
         </div>
       ))}
     </div>

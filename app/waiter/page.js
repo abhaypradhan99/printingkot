@@ -19,6 +19,7 @@ export default function WaiterPage() {
   const [variants, setVariants] = useState({}); // menuId -> "full" | "half"
   const [submitting, setSubmitting] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
+  const [categoryOrder, setCategoryOrder] = useState([]);
 
   useEffect(() => {
     const unsubTables = onSnapshot(
@@ -29,9 +30,14 @@ export default function WaiterPage() {
       query(collection(db, "menu"), orderBy("createdAt", "desc")),
       (snap) => setMenu(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubOrder = onSnapshot(doc(db, "config", "categoryOrder"), (snap) => {
+      const data = snap.data();
+      setCategoryOrder(data?.order || []);
+    });
     return () => {
       unsubTables();
       unsubMenu();
+      unsubOrder();
     };
   }, []);
 
@@ -42,8 +48,21 @@ export default function WaiterPage() {
       if (!byCategory[cat]) byCategory[cat] = [];
       byCategory[cat].push(item);
     }
-    return byCategory;
-  }, [menu]);
+    const cats = Object.keys(byCategory);
+    cats.sort((a, b) => {
+      const ai = categoryOrder.indexOf(a);
+      const bi = categoryOrder.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+    const sorted = {};
+    for (const cat of cats) {
+      sorted[cat] = byCategory[cat];
+    }
+    return sorted;
+  }, [menu, categoryOrder]);
 
   const cartItems = useMemo(() => {
     return Object.entries(cart)
@@ -110,115 +129,116 @@ export default function WaiterPage() {
   }
 
   return (
-    <div className="container">
-      <h1>Waiter</h1>
+    <div className="waiter-page">
+      <div className="container">
+        <h1>Waiter</h1>
 
-      <div className="card">
-        <label>Table</label>
-        <select value={tableId} onChange={(e) => setTableId(e.target.value)}>
-          <option value="">Select a table</option>
-          {tables.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-        {tables.length === 0 && (
-          <p style={{ fontSize: 13, color: "#666" }}>
-            No tables yet — add tables in Admin first.
-          </p>
-        )}
-      </div>
-
-      {Object.keys(grouped).length === 0 && (
-        <p style={{ color: "#666" }}>No menu items yet — add some in Admin.</p>
-      )}
-
-      {Object.entries(grouped).map(([category, items]) => (
-        <div className="card" key={category}>
-          <strong>{category}</strong>
-          <div className="menu-grid">
-            {items.map((item) => {
-              const hasHalf = !!item.halfPrice;
-              const variant = variants[item.id] || "full";
-              const price = getItemPrice(item, variant);
-              const key = `${item.id}:${variant}`;
-              const qty = cart[key] || 0;
-              return (
-                <div className="menu-item" key={item.id}>
-                  <div className="menu-item-name">{item.name}</div>
-                  <div className="menu-item-price">
-                    {hasHalf ? (
-                      <>
-                        <span className={variant === "half" ? "price-highlight" : ""}>Half: Rs. {item.halfPrice}</span>
-                        <span className="price-sep">|</span>
-                        <span className={variant === "full" ? "price-highlight" : ""}>Full: Rs. {item.fullPrice || item.price}</span>
-                      </>
-                    ) : (
-                      <>Rs. {item.fullPrice || item.price}</>
-                    )}
-                  </div>
-                  {hasHalf && (
-                    <div className="variant-selector">
-                      <button
-                        className={`variant-btn ${variant === "full" ? "active" : ""}`}
-                        onClick={() => changeVariant(item.id, "full")}
-                      >
-                        Full
-                      </button>
-                      <button
-                        className={`variant-btn ${variant === "half" ? "active" : ""}`}
-                        onClick={() => changeVariant(item.id, "half")}
-                      >
-                        Half
-                      </button>
-                    </div>
-                  )}
-                  <div className="stepper">
-                    <button onClick={() => changeQty(item.id, variant, -1)}>−</button>
-                    <span>{qty}</span>
-                    <button onClick={() => changeQty(item.id, variant, 1)}>+</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-
-      {cartItems.length > 0 && (
         <div className="card">
-          <strong>Order summary</strong>
-          {cartItems.map((i) => (
-            <div className="row" key={i.menuId} style={{ marginTop: 6 }}>
-              <span>
-                {i.name} x{i.qty}
-              </span>
-              <span>Rs. {i.qty * i.price}</span>
-            </div>
-          ))}
-          <div className="row" style={{ marginTop: 10, fontWeight: 700 }}>
-            <span>Total</span>
-            <span>Rs. {total}</span>
-          </div>
+          <label>Table</label>
+          <select value={tableId} onChange={(e) => setTableId(e.target.value)}>
+            <option value="">Select a table</option>
+            {tables.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          {tables.length === 0 && (
+            <p style={{ fontSize: 13, color: "#666" }}>
+              No tables yet — add tables in Admin first.
+            </p>
+          )}
         </div>
-      )}
 
-      <button
-        className="btn btn-primary"
-        disabled={!tableId || cartItems.length === 0 || submitting}
-        onClick={submitOrder}
-      >
-        {submitting
-          ? "Sending..."
-          : justSubmitted
-          ? "Order sent ✓"
-          : "Order Taken — Send to Print"}
-      </button>
+        {Object.keys(grouped).length === 0 && (
+          <p style={{ color: "#666" }}>No menu items yet — add some in Admin.</p>
+        )}
 
-      <a href="/" className="btn btn-secondary" style={{ marginTop: 8 }}>
-        Back
-      </a>
+        {Object.entries(grouped).map(([category, items]) => (
+          <div className="card" key={category}>
+            <strong>{category}</strong>
+            <div className="menu-grid">
+              {items.map((item) => {
+                const hasHalf = !!item.halfPrice;
+                const variant = variants[item.id] || "full";
+                const price = getItemPrice(item, variant);
+                const key = `${item.id}:${variant}`;
+                const qty = cart[key] || 0;
+                return (
+                  <div className="menu-item" key={item.id}>
+                    <div className="menu-item-name">{item.name}</div>
+                    <div className="menu-item-price">
+                      {hasHalf ? (
+                        <>
+                          <span className={variant === "half" ? "price-highlight" : ""}>Half: Rs. {item.halfPrice}</span>
+                          <span className="price-sep">|</span>
+                          <span className={variant === "full" ? "price-highlight" : ""}>Full: Rs. {item.fullPrice || item.price}</span>
+                        </>
+                      ) : (
+                        <>Rs. {item.fullPrice || item.price}</>
+                      )}
+                    </div>
+                    {hasHalf && (
+                      <div className="variant-selector">
+                        <button
+                          className={`variant-btn ${variant === "full" ? "active" : ""}`}
+                          onClick={() => changeVariant(item.id, "full")}
+                        >
+                          Full
+                        </button>
+                        <button
+                          className={`variant-btn ${variant === "half" ? "active" : ""}`}
+                          onClick={() => changeVariant(item.id, "half")}
+                        >
+                          Half
+                        </button>
+                      </div>
+                    )}
+                    <div className="stepper">
+                      <button onClick={() => changeQty(item.id, variant, -1)}>−</button>
+                      <span>{qty}</span>
+                      <button onClick={() => changeQty(item.id, variant, 1)}>+</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {cartItems.length > 0 && (
+          <div className="card">
+            <strong>Order summary</strong>
+            {cartItems.map((i) => (
+              <div className="row" key={i.menuId} style={{ marginTop: 6 }}>
+                <span>
+                  {i.name} x{i.qty}
+                </span>
+                <span>Rs. {i.qty * i.price}</span>
+              </div>
+            ))}
+            <div className="row" style={{ marginTop: 10, fontWeight: 700 }}>
+              <span>Total</span>
+              <span>Rs. {total}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="waiter-footer">
+          <a href="/" className="btn btn-secondary">Back</a>
+          <button
+            className="btn btn-primary"
+            disabled={!tableId || cartItems.length === 0 || submitting}
+            onClick={submitOrder}
+          >
+            {submitting
+              ? "Sending..."
+              : justSubmitted
+              ? "Order sent ✓"
+              : "Order Taken — Send to Print"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
