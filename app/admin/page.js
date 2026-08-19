@@ -193,14 +193,6 @@ function CategoriesAdmin() {
     }
   }
 
-  async function moveCategory(index, direction) {
-    const newOrder = [...order];
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= newOrder.length) return;
-    [newOrder[index], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[index]];
-    await saveOrder(newOrder);
-  }
-
   const sorted = [...categories].sort((a, b) => {
     const ai = order.indexOf(a);
     const bi = order.indexOf(b);
@@ -209,6 +201,14 @@ function CategoriesAdmin() {
     if (bi === -1) return -1;
     return ai - bi;
   });
+
+  async function moveCategory(sortedIndex, direction) {
+    const targetIndex = sortedIndex + direction;
+    if (targetIndex < 0 || targetIndex >= sorted.length) return;
+    const newOrder = [...sorted];
+    [newOrder[sortedIndex], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[sortedIndex]];
+    await saveOrder(newOrder);
+  }
 
   return (
     <div>
