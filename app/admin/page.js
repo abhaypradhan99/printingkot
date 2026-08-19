@@ -11,6 +11,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  getDocs,
 } from "firebase/firestore";
 
 export default function AdminPage() {
@@ -32,8 +33,14 @@ export default function AdminPage() {
         >
           Tables
         </div>
+        <div
+          className={`tab ${tab === "orders" ? "active" : ""}`}
+          onClick={() => setTab("orders")}
+        >
+          Orders
+        </div>
       </div>
-      {tab === "menu" ? <MenuAdmin /> : <TablesAdmin />}
+      {tab === "menu" ? <MenuAdmin /> : tab === "tables" ? <TablesAdmin /> : <OrdersAdmin />}
       <a href="/" className="btn btn-secondary" style={{ marginTop: 8 }}>
         Back
       </a>
@@ -44,7 +51,8 @@ export default function AdminPage() {
 function MenuAdmin() {
   const [items, setItems] = useState([]);
   const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
+  const [fullPrice, setFullPrice] = useState("");
+  const [halfPrice, setHalfPrice] = useState("");
   const [category, setCategory] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -58,17 +66,19 @@ function MenuAdmin() {
 
   async function addItem(e) {
     e.preventDefault();
-    if (!name.trim() || !price) return;
+    if (!name.trim() || !fullPrice) return;
     setSaving(true);
     try {
       await addDoc(collection(db, "menu"), {
         name: name.trim(),
-        price: Number(price),
+        fullPrice: Number(fullPrice),
+        halfPrice: halfPrice ? Number(halfPrice) : null,
         category: category.trim() || "General",
         createdAt: serverTimestamp(),
       });
       setName("");
-      setPrice("");
+      setFullPrice("");
+      setHalfPrice("");
       setCategory("");
     } finally {
       setSaving(false);
@@ -89,10 +99,16 @@ function MenuAdmin() {
             onChange={(e) => setName(e.target.value)}
           />
           <input
-            placeholder="Price (Rs.)"
+            placeholder="Full price (Rs.)"
             type="number"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            value={fullPrice}
+            onChange={(e) => setFullPrice(e.target.value)}
+          />
+          <input
+            placeholder="Half price (Rs.) — optional"
+            type="number"
+            value={halfPrice}
+            onChange={(e) => setHalfPrice(e.target.value)}
           />
           <input
             placeholder="Category (e.g. Starters) — optional"
@@ -114,7 +130,10 @@ function MenuAdmin() {
           <div>
             <strong>{item.name}</strong>
             <div style={{ fontSize: 13, color: "#666" }}>
-              {item.category} · Rs. {item.price}
+              {item.category}
+              {item.halfPrice
+                ? ` · Full: Rs. ${item.fullPrice || item.price} · Half: Rs. ${item.halfPrice}`
+                : ` · Rs. ${item.fullPrice || item.price}`}
             </div>
           </div>
           <button
@@ -191,6 +210,73 @@ function TablesAdmin() {
           >
             Delete
           </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OrdersAdmin() {
+  const [orders, setOrders] = useState([]);
+  const [clearing, setClearing] = useState(false);
+
+  useEffect(() => {
+    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setOrders(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  async function clearAllOrders() {
+    const confirmed = window.confirm(
+      `This will permanently delete all ${orders.length} order(s). Continue?`
+    );
+    if (!confirmed) return;
+    setClearing(true);
+    try {
+      const snap = await getDocs(collection(db, "orders"));
+      const deletes = snap.docs.map((d) => deleteDoc(doc(db, "orders", d.id)));
+      await Promise.all(deletes);
+      setOrders([]);
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <strong>All Orders</strong>
+          <div style={{ fontSize: 13, color: "#666" }}>
+            {orders.length} order(s) in history
+          </div>
+        </div>
+        {orders.length > 0 && (
+          <button
+            className="btn btn-danger"
+            style={{ width: "auto", padding: "10px 16px" }}
+            onClick={clearAllOrders}
+            disabled={clearing}
+          >
+            {clearing ? "Clearing..." : "Clear All Orders"}
+          </button>
+        )}
+      </div>
+
+      {orders.length === 0 && (
+        <p style={{ color: "#666" }}>No orders yet.</p>
+      )}
+
+      {orders.map((order) => (
+        <div className="card row" key={order.id}>
+          <div>
+            <strong>Table {order.tableName}</strong>
+            <div style={{ fontSize: 13, color: "#666" }}>
+              {order.items.length} item(s) · Rs. {order.total} · {order.status}
+            </div>
+          </div>
         </div>
       ))}
     </div>

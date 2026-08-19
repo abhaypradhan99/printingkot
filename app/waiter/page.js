@@ -15,7 +15,8 @@ export default function WaiterPage() {
   const [tables, setTables] = useState([]);
   const [menu, setMenu] = useState([]);
   const [tableId, setTableId] = useState("");
-  const [cart, setCart] = useState({}); // menuId -> qty
+  const [cart, setCart] = useState({}); // "menuId:variant" -> qty
+  const [variants, setVariants] = useState({}); // menuId -> "full" | "half"
   const [submitting, setSubmitting] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
 
@@ -47,18 +48,37 @@ export default function WaiterPage() {
   const cartItems = useMemo(() => {
     return Object.entries(cart)
       .filter(([, qty]) => qty > 0)
-      .map(([menuId, qty]) => {
+      .map(([key, qty]) => {
+        const [menuId, variant] = key.split(":");
         const item = menu.find((m) => m.id === menuId);
-        return item ? { menuId, name: item.name, price: item.price, qty } : null;
+        if (!item) return null;
+        const price = getItemPrice(item, variant);
+        const name = getItemLabel(item, variant);
+        return { menuId, name, price, qty, variant };
       })
       .filter(Boolean);
   }, [cart, menu]);
 
   const total = cartItems.reduce((sum, i) => sum + i.qty * i.price, 0);
 
-  function changeQty(menuId, delta) {
+  function getItemPrice(item, variant) {
+    if (variant === "half") return item.halfPrice || 0;
+    return item.fullPrice || item.price || 0;
+  }
+
+  function getItemLabel(item, variant) {
+    if (variant === "half") return `Half ${item.name}`;
+    return item.name;
+  }
+
+  function changeVariant(menuId, variant) {
+    setVariants((prev) => ({ ...prev, [menuId]: variant }));
+  }
+
+  function changeQty(menuId, variant, delta) {
+    const key = `${menuId}:${variant}`;
     setCart((prev) => {
-      const next = { ...prev, [menuId]: Math.max(0, (prev[menuId] || 0) + delta) };
+      const next = { ...prev, [key]: Math.max(0, (prev[key] || 0) + delta) };
       return next;
     });
   }
@@ -118,17 +138,50 @@ export default function WaiterPage() {
         <div className="card" key={category}>
           <strong>{category}</strong>
           <div className="menu-grid">
-            {items.map((item) => (
-              <div className="menu-item" key={item.id}>
-                <div className="menu-item-name">{item.name}</div>
-                <div className="menu-item-price">Rs. {item.price}</div>
-                <div className="stepper">
-                  <button onClick={() => changeQty(item.id, -1)}>−</button>
-                  <span>{cart[item.id] || 0}</span>
-                  <button onClick={() => changeQty(item.id, 1)}>+</button>
+            {items.map((item) => {
+              const hasHalf = !!item.halfPrice;
+              const variant = variants[item.id] || "full";
+              const price = getItemPrice(item, variant);
+              const key = `${item.id}:${variant}`;
+              const qty = cart[key] || 0;
+              return (
+                <div className="menu-item" key={item.id}>
+                  <div className="menu-item-name">{item.name}</div>
+                  <div className="menu-item-price">
+                    {hasHalf ? (
+                      <>
+                        <span className={variant === "half" ? "price-highlight" : ""}>Half: Rs. {item.halfPrice}</span>
+                        <span className="price-sep">|</span>
+                        <span className={variant === "full" ? "price-highlight" : ""}>Full: Rs. {item.fullPrice || item.price}</span>
+                      </>
+                    ) : (
+                      <>Rs. {item.fullPrice || item.price}</>
+                    )}
+                  </div>
+                  {hasHalf && (
+                    <div className="variant-selector">
+                      <button
+                        className={`variant-btn ${variant === "full" ? "active" : ""}`}
+                        onClick={() => changeVariant(item.id, "full")}
+                      >
+                        Full
+                      </button>
+                      <button
+                        className={`variant-btn ${variant === "half" ? "active" : ""}`}
+                        onClick={() => changeVariant(item.id, "half")}
+                      >
+                        Half
+                      </button>
+                    </div>
+                  )}
+                  <div className="stepper">
+                    <button onClick={() => changeQty(item.id, variant, -1)}>−</button>
+                    <span>{qty}</span>
+                    <button onClick={() => changeQty(item.id, variant, 1)}>+</button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}
