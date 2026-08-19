@@ -5,6 +5,7 @@ import { db } from "../../lib/firebase";
 import {
   addDoc,
   collection,
+  doc,
   onSnapshot,
   orderBy,
   query,
